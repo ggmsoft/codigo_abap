@@ -1,0 +1,41 @@
+DATA: g_line_length        TYPE i VALUE 80,
+      go_comsoli_container TYPE REF TO cl_gui_custom_container,
+      go_comsoli_edit      TYPE REF TO cl_gui_textedit.
+
+IF go_comsoli_container IS INITIAL.
+
+    CREATE OBJECT go_comsoli_container
+      EXPORTING
+        container_name              = 'GO_COMSOLI_CONTAINER'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5.
+
+    CREATE OBJECT go_comsoli_edit
+      EXPORTING
+        parent                     = go_comsoli_container
+        wordwrap_mode              = cl_gui_textedit=>wordwrap_at_fixed_position
+        wordwrap_position          = g_line_length
+        wordwrap_to_linebreak_mode = cl_gui_textedit=>true
+        max_number_chars           = 0.
+
+    go_comsoli_edit->set_toolbar_mode(
+        EXPORTING
+          toolbar_mode = cl_gui_textedit=>false ).
+
+    go_comsoli_edit->set_statusbar_mode(
+      EXPORTING
+        statusbar_mode = cl_gui_textedit=>false ).
+
+ENDIF.
+
+
+
+### BLOQUEAR EDITOR
+go_comsoli_edit->set_readonly_mode( c_uno ).
+
+### DESBLOQUEAR EDITOR
+go_comsoli_edit->set_readonly_mode( 0 ).
