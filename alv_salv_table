@@ -1,0 +1,96 @@
+*&---------------------------------------------------------------------*
+*&      Form  MOSTRAR_DATOS
+*&---------------------------------------------------------------------*
+*       Muestra el informe solicitado
+*----------------------------------------------------------------------*
+FORM mostrar_datos.
+
+
+  DATA: l_v_error TYPE char50.
+
+*  IF l_no_auth NE 'X'.
+
+  DATA: l_alv TYPE REF TO cl_salv_table,
+        l_funciones  TYPE REF TO cl_salv_functions_list, "cl_salv_functions_list
+        alv_msg      TYPE REF TO cx_salv_msg,
+        gr_display   TYPE REF TO cl_salv_display_settings.
+
+  DATA: gr_layout TYPE REF TO cl_salv_layout.
+  DATA: key TYPE salv_s_layout_key.
+
+  TRY.
+      CALL METHOD cl_salv_table=>factory
+*        EXPORTING
+*          list_display   = if_salv_c_bool_sap=>false
+*          r_container    =
+*          container_name =
+        IMPORTING
+         r_salv_table   = l_alv
+        CHANGING
+          t_table        = g_t_datos[].
+    CATCH cx_salv_msg INTO alv_msg.
+      MESSAGE alv_msg TYPE 'I'.
+      EXIT.
+  ENDTRY.
+  DATA: gc_false        TYPE c         VALUE ''.
+* Editar catalogo ALV
+  PERFORM columnas USING l_alv.
+* Funciones del alv
+  l_funciones = l_alv->get_functions( ).
+  l_funciones->set_all( abap_true ).
+
+  gr_layout = l_alv->get_layout( ).
+  key-report = sy-repid.
+  gr_layout->set_key( key ).
+  gr_layout->set_save_restriction( if_salv_c_layout=>restrict_none ).
+
+  g_selections = l_alv->get_selections( ).
+  g_selections->set_selection_mode( if_salv_c_selection_mode=>row_column ).
+
+
+  g_events = l_alv->get_event( ).
+
+  CREATE OBJECT g_handle_events.
+* Capturamos el doubleclick
+  SET HANDLER g_handle_events->on_double_click FOR g_events.
+
+* Capturamos el user-command
+  SET HANDLER g_handle_events->on_user_command FOR g_events.
+
+* Establecimiento cabecera
+  CALL METHOD g_handle_events->set_top_of_page
+    CHANGING
+      c_alv = l_alv.
+
+  l_alv->display( ).
+
+*  ELSE.
+*
+*    CONCATENATE text-004  INTO l_v_error SEPARATED BY space.
+
+*    MESSAGE text-004 TYPE 'S' DISPLAY LIKE 'E'.
+
+*  ENDIF.
+
+
+ENDFORM.                    " MOSTRAR_DATOS
+
+
+*&---------------------------------------------------------------------*
+*&      Form  columnas
+*&---------------------------------------------------------------------*
+*       Edita propiedades de las columnas
+*----------------------------------------------------------------------*
+FORM columnas USING p_alv TYPE REF TO cl_salv_table.
+
+  DATA: l_columnas TYPE REF TO cl_salv_columns,
+        l_columna   TYPE REF TO cl_salv_column.
+* Obtenemos las columnas
+  l_columnas = p_alv->get_columns( ).
+  l_columnas->set_optimize( ).
+  l_columna ?= l_columnas->get_column( 'MANDT' ).
+  l_columna->set_visible( ' ' ).
+*  l_columnas->remove_column( 'MANDT' ).
+
+
+ENDFORM.                    " COLUMNAS
