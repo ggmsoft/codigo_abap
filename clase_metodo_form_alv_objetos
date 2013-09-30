@@ -1,0 +1,153 @@
+*---------------------------------------------------------------------*
+*       CLASS lcl_manejador_eventos DEFINITION
+*---------------------------------------------------------------------*
+
+*---------------------------------------------------------------------*
+CLASS lcl_event_handler DEFINITION.
+
+  PUBLIC SECTION.
+    METHODS:
+* Control cambio de datos.
+      handle_data_changed_101
+      FOR EVENT data_changed OF cl_gui_alv_grid
+      IMPORTING e_onf4
+                er_data_changed,
+* Control cuando el cambio de datos ha finalizado.
+      handle_data_changed_fin_101
+      FOR EVENT data_changed_finished OF cl_gui_alv_grid
+      IMPORTING e_modified
+                et_good_cells.
+                
+*&---------------------------------------------------------------------*
+*&       Class (Implementation)  lcl_event_handler
+*&---------------------------------------------------------------------*
+*        Text
+*----------------------------------------------------------------------*
+CLASS lcl_event_handler IMPLEMENTATION.
+
+*Handle Data Changed
+  METHOD handle_data_changed_101 .
+    PERFORM handle_data_changed_101 USING er_data_changed.
+  ENDMETHOD.                    "handle_data_changed
+**Handle Data Changed Finished
+  METHOD handle_data_changed_fin_101 .
+    PERFORM handle_data_changed_fin_101 USING e_modified
+                                              et_good_cells.
+  ENDMETHOD .                    "handle_data_changed_finished
+  
+  
+*&---------------------------------------------------------------------*
+*&      Form  HANDLE_DATA_CHANGED_101
+*&---------------------------------------------------------------------*
+FORM handle_data_changed_101  USING p_data_changed TYPE REF TO cl_alv_changed_data_protocol.
+
+  FIELD-SYMBOLS: <fs_datos_alv> TYPE gtype_t_datos_generales.
+  FIELD-SYMBOLS: <fs_celdas> TYPE lvc_t_modi.
+  DATA: l_wa_celdas TYPE lvc_s_modi,
+        l_tabix   TYPE sy-tabix,
+        l_wa_datos_alv TYPE LINE OF gtype_t_datos_generales.
+
+* Obtenemos los datos del alv.
+  ASSIGN p_data_changed->mp_mod_rows->* TO <fs_datos_alv>.
+
+* Inicializamos el log de errores.
+  CALL METHOD p_data_changed->refresh_protocol.
+
+* Vemos las celdas modificadas.
+  ASSIGN p_data_changed->mt_mod_cells TO <fs_celdas>.
+  CLEAR: l_tabix.
+
+  LOOP AT <fs_datos_alv> INTO l_wa_datos_alv.
+    l_tabix = sy-tabix.
+
+*  Chequeo campos vacios
+    PERFORM chequear_vacios_101 USING    l_wa_datos_alv
+                                         p_data_changed
+                                         l_wa_celdas.
+
+
+    READ TABLE <fs_celdas> INTO l_wa_celdas WITH KEY fieldname = 'FISTL'
+                                                     tabix     = l_tabix.
+    IF sy-subrc = 0.
+* Si se ha modificado el centro gestor.
+      PERFORM validacion_fistl USING l_wa_datos_alv
+                                     p_data_changed
+                                     l_wa_celdas.
+    ENDIF.
+
+    READ TABLE <fs_celdas> INTO l_wa_celdas WITH KEY fieldname = 'EJERCICIO'
+                                                     tabix     = l_tabix.
+    IF sy-subrc = 0.
+* si se ha modificado el ejercicio.
+      PERFORM chequeo_duplicados USING l_wa_datos_alv
+                                       p_data_changed
+                                       l_wa_celdas
+                                 CHANGING g_t_ejercicio.
+    ENDIF.
+  ENDLOOP.
+
+
+ENDFORM.                    " HANDLE_DATA_CHANGED_101
+*&---------------------------------------------------------------------*
+*&      Form  HANDLE_DATA_CHANGED_FIN_101
+*&---------------------------------------------------------------------*
+FORM handle_data_changed_fin_101  USING p_modified TYPE char1
+                                        pt_good_cells TYPE lvc_t_modi.
+
+* Vamos a actualizar los textos y proteger el campo ejercicio.
+  DATA: ls_stable  TYPE lvc_s_stbl,
+        l_entidad  TYPE t001-fikrs,
+        l_wa_celda TYPE lvc_s_styl.
+
+  FIELD-SYMBOLS: <l_wa_linea> TYPE LINE OF gtype_t_datos_generales.
+
+* Obligatorio al menos una linea en tabla de Datos generales
+*  IF g_t_datos_generales[] IS INITIAL.
+*    MESSAGE e020(zja_ps_ms_01).
+**   Es obligatorio insertar datos en Tabla de datos generales
+*  ENDIF.
+
+  CHECK p_modified IS NOT INITIAL.
+
+  ls_stable-row = 'X'.
+  ls_stable-col = 'X'.
+
+** Obtencion de Entidad para texto Centro gestor
+*  SELECT SINGLE   fikrs
+*          FROM    t001
+*           INTO   l_entidad
+*            WHERE bukrs EQ prps-pbukr.
+
+  LOOP AT g_t_datos_generales ASSIGNING <l_wa_linea>.
+* Cargamos texto FISTL.
+    CLEAR <l_wa_linea>-bezeich.
+    SELECT SINGLE   bezeich
+               FROM    fmfctrt
+                INTO   <l_wa_linea>-bezeich
+                WHERE  spras  EQ sy-langu
+                 AND   datbis GT sy-datum
+                  AND  fikrs  EQ g_entidad
+                   AND fictr  EQ <l_wa_linea>-fistl.
+
+    IF <l_wa_linea>-ejercicio IS NOT INITIAL.
+      l_wa_celda-fieldname = 'EJERCICIO'.
+*     Si existen datos es no editable
+      l_wa_celda-style = cl_gui_alv_grid=>mc_style_disabled.
+      INSERT l_wa_celda INTO TABLE <l_wa_linea>-estilo_celdas.
+    ENDIF.
+
+  ENDLOOP.
+
+  CALL METHOD g_alv_generales->refresh_table_display
+    EXPORTING
+      is_stable = ls_stable
+    EXCEPTIONS
+      finished  = 1
+      OTHERS    = 2.
+
+  IF sy-subrc NE 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+               WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+ENDFORM.                    " HANDLE_DATA_CHANGED_FIN_101  
