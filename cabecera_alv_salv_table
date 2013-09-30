@@ -1,0 +1,102 @@
+*Necesario Establecimiento previo del método en la clase
+  METHOD set_top_of_page.
+
+
+* Establecimiento  de informacion de cabecera
+    DATA:l_obj_header   TYPE REF TO cl_salv_form_layout_grid,
+         l_campo        TYPE REF TO cl_salv_form_label,
+         l_valor        TYPE REF TO cl_salv_form_layout_flow.
+
+    DATA:l_obj_titulo   TYPE REF TO cl_salv_display_settings.
+
+    DATA:l_cols         TYPE REF TO cl_salv_columns,
+         l_column       TYPE REF TO cl_salv_column.
+
+    DATA l_wa_26        TYPE      zja_fa_t_000026.
+
+    DATA l_texto_estado TYPE text20.
+
+*  Lectura de datos de cabecera
+    SELECT SINGLE * from zja_fa_t_000026
+      INTO    l_wa_26
+        WHERE FIKRS EQ p_fikrs
+         AND  GJAHR EQ p_ejer
+          AND NCERT EQ p_certif.
+
+
+*   Objeto de cabecera
+    CREATE OBJECT l_obj_header.
+
+*   Titulo  Ejercicio
+    l_campo = l_obj_header->create_label( row = 1 column = 1 ).
+    l_campo->set_text( text-c01 ).
+*   Valor campo ejercicio
+    l_valor = l_obj_header->create_flow( row = 1  column = 2 ).
+    l_valor->create_text( text = l_wa_26-GJAHR ).
+
+*   Titulo Numero de certificacion
+    l_campo = l_obj_header->create_label( row = 2 column = 1 ).
+    l_campo->set_text( text-c02 ).
+*   Valor Campo Numero certificacion
+    l_valor = l_obj_header->create_flow( row = 2  column = 2 ).
+    l_valor->create_text( text = l_wa_26-NCERT ).
+
+*   Titulo Fecha creacion de la certificacion
+    l_campo = l_obj_header->create_label( row = 3 column = 1 ).
+    l_campo->set_text( text-c03 ).
+*   Valor Fecha creacion de la certificacion
+    l_valor = l_obj_header->create_flow( row = 3  column = 2 ).
+    l_valor->create_text( text = l_wa_26-fechc ).
+
+*   Titulo Fecha de la última modificación
+    l_campo = l_obj_header->create_label( row = 4 column = 1 ).
+    l_campo->set_text( text-c04 ).
+*   Valor Fecha de la última modificación
+    l_valor = l_obj_header->create_flow( row = 4  column = 2 ).
+    l_valor->create_text( text = l_wa_26-fechm ).
+
+*   Titulo Estado de la Certificación
+    l_campo = l_obj_header->create_label( row = 5 column = 1 ).
+    l_campo->set_text( text-c05 ).
+*   Valor Estado de la Certificación
+    l_valor = l_obj_header->create_flow( row = 5  column = 2 ).
+    l_valor->create_text( text = l_wa_26-ESTAD ).
+
+
+*  Busqueda Texto estado
+    SELECT SIngle denominacion FROM ZJA_FA_T_PAR029T
+      INTO l_texto_estado
+       WHERE spras EQ sy-langu
+        AND  estado EQ  l_wa_26-ESTAD.
+
+*   Titulo Texto Estado Certificación
+    l_campo = l_obj_header->create_label( row = 6 column = 1 ).
+    l_campo->set_text( text-c06 ).
+*   Valor Texto Estado Certificación
+    l_valor = l_obj_header->create_flow( row = 6  column = 2 ).
+    l_valor->create_text( text = l_texto_estado ).
+
+
+
+*   Titulo Informe
+    l_obj_titulo = c_alv->get_display_settings( ).
+    l_obj_titulo->set_list_header( text-t01 ).
+
+*   Cabecera Online
+    c_alv->set_top_of_list( l_obj_header ).
+*
+*   Cabecera Impresion
+    c_alv->set_top_of_list_print( l_obj_header ).
+
+** Poner Sociedad como no visible
+** Obtencion de columnas del ALV
+*    l_cols = c_alv->get_columns( ).
+** Cambiar Campo Sociedad como no visible
+*    TRY.
+*        l_column = l_cols->get_column( 'BUKRS' ).
+*        l_column->set_visible( '' ).
+*      CATCH cx_salv_not_found.                          "#EC NO_HANDLER
+*    ENDTRY.
+
+
+  ENDMETHOD.                    "set_top_of_page
