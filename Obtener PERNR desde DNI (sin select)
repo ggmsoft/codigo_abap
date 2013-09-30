@@ -1,0 +1,94 @@
+REPORT  zobt_pernr.
+
+* Declaración de variables
+DATA:
+  d_dni          TYPE dynfieldvalue,
+  d_texto        TYPE string,
+  d_dni_num      TYPE numc10,
+  d_dni_char     TYPE char10,
+  d_extranjero   TYPE flag,
+  d_dni_char_aux TYPE char10.
+* Declaración de estructuras
+DATA:
+  wa_return      TYPE ddshretval.
+* Declaración de tablas
+DATA:
+  it_return      TYPE TABLE OF ddshretval.
+
+*-----------------------------------------------------------------*
+
+*d_dni_char = 'X00003839J'.
+*d_dni_char = '22823f'.
+d_dni_char = '10300565S'.
+* Se justifica el DNI a la derecha
+WRITE d_dni_char TO d_dni_char RIGHT-JUSTIFIED.
+
+* Se pasa a mayúsculas y se copia a una variable auxiliar
+TRANSLATE d_dni_char TO UPPER CASE.
+d_dni_char_aux = d_dni_char.
+
+* Se comprueba si el DNI es de extranjero
+REPLACE 'X' INTO d_dni_char(9) WITH '#'.
+IF sy-subrc EQ 0.
+  d_extranjero = 'X'.
+
+ELSE.
+  REPLACE 'Y' INTO d_dni_char(9) WITH '#'.
+
+  IF sy-subrc EQ 0.
+    d_extranjero = 'Y'.
+  ENDIF.
+
+ENDIF.
+
+* Se cogen todos los caracteres excepto la letra del final
+d_dni_num = d_dni_char(9).
+
+* Se quitan los ceros de la izquierda del DNI
+CLEAR d_dni_char.
+CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+  EXPORTING
+    input  = d_dni_num
+  IMPORTING
+    output = d_dni_char.
+
+* Se concatena la cadena para la búsqueda del PERNR
+IF d_extranjero IS NOT INITIAL.
+  CONCATENATE '=..*' d_extranjero '*' d_dni_char d_dni_char_aux+9(1) '*' INTO d_dni.
+
+ELSE.
+  CONCATENATE '=..*' d_dni_char d_dni_char_aux+9(1) '*' INTO d_dni.
+
+ENDIF.
+
+* Obtiene el PERNR del DNI indicado mediante la ayuda de búsqueda estándar PREMC
+CALL FUNCTION 'F4IF_FIELD_VALUE_REQUEST'
+  EXPORTING
+    tabname             = space
+    fieldname           = space
+    searchhelp          = 'PREMC'
+    shlpparam           = 'PERNR'
+    value               = d_dni
+    display             = 'X'
+    suppress_recordlist = 'X'
+    selection_screen    = 'X'
+  TABLES
+    return_tab          = it_return
+  EXCEPTIONS
+    field_not_found     = 1
+    no_help_for_field   = 2
+    inconsistent_help   = 3
+    no_values_found     = 4
+    OTHERS              = 5.
+
+IF sy-subrc EQ 0.
+* Se eliminan los registro que no se necesitan
+  DELETE it_return WHERE fieldname NE 'PERNR'.
+
+* Se imprimen todos los posibles resultados, SOLO DEBERÍA DE HABER UNO
+  LOOP AT it_return INTO wa_return.
+    CONCATENATE 'Nº de personal: ' wa_return-fieldval INTO d_texto SEPARATED BY space.
+    WRITE d_texto.
+  ENDLOOP.
+
+ENDIF.
